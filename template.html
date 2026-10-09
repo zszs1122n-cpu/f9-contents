@@ -60,7 +60,9 @@ input[type=search]{flex:1;min-width:0}
 #more{height:1px}
 .lr{display:flex;gap:8px;align-items:center}
 .lr .lk{flex:1;min-width:0}
-.alt{flex:none;font-size:12px;color:var(--muted);text-decoration:underline;padding:4px}
+.lk.off{cursor:default}
+.lk.off:hover{background:none}
+.off-note{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .ck{flex:none;width:34px;height:34px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--card);
   color:transparent;font:700 15px/1 inherit;cursor:pointer;display:grid;place-items:center}
 .ck:hover{border-color:var(--seen);color:var(--seen)}
@@ -117,6 +119,17 @@ const PF = {
   tiktok:["틱톡","#222"], naver:["네이버","#03a94d"], x:["X","#444"], fromm:["프롬","#7b4fd6"], etc:["기타","#888"]
 };
 const PLAYER = "http://127.0.0.1:12212/";  // 내 PC의 프롬 PC 다시보기 (프롬 영상은 여기서 재생)
+// 프롬 PC 다시보기의 '컨텐츠 목록' 버튼은 ?player=1 로 연다 → 이 브라우저를 '플레이어 있음'으로 기억한다 (?player=off 로 해제).
+// 플레이어가 없는 브라우저에서는 프롬 항목을 누를 수 없게 둔다.
+let HAS_PLAYER = false;
+try {
+  const flag = new URLSearchParams(location.search).get("player");
+  if (flag !== null){
+    flag === "off" ? localStorage.removeItem("f9-player") : localStorage.setItem("f9-player", "1");
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
+  HAS_PLAYER = localStorage.getItem("f9-player") === "1";
+} catch(e){}
 // 생일순 (나이 많은 순): 새롬 97.01.07 · 하영 97.09.29 · 규리 97.12.27 · 지원 98.03.20 · 지선 98.11.23 · 서연 00.01.22 · 채영 00.05.14 · 나경 00.06.01 · 지헌 03.04.17
 const MEMBERS = ["새롬","하영","규리","지원","지선","서연","채영","나경","지헌"];
 const DOW = ["일","월","화","수","목","금","토"];
@@ -212,8 +225,10 @@ function card({e, links}){
       ? `<span class="thumb" data-bg="https://i.ytimg.com/vi/${l.y}/mqdefault.jpg"></span>`
       : `<span class="pf" style="background:${PF[l.p][1]}">${PF[l.p][0]}</span>`;
     const href = l.f ? PLAYER + "?post=" + l.f : l.u;
-    const alt = l.f ? `<a class="alt" href="${esc(l.u)}" target="_blank" rel="noopener" title="PC 플레이어가 없을 때">프롬 앱</a>` : "";
-    return `<div class="lr${on?" seen":""}" data-k="${l.k}"><a class="lk" href="${esc(href)}" target="_blank" rel="noopener"${l.f?' title="프롬 PC 다시보기로 열기"':''}>${lead}<span class="lk-t">${text}</span></a>${alt}`
+    const item = l.p === "fromm" && !(HAS_PLAYER && l.f)
+      ? `<div class="lk off" title="프롬 앱에서만 볼 수 있어요">${lead}<span class="lk-t">${text}<span class="off-note">프롬 앱 전용</span></span></div>`
+      : `<a class="lk" href="${esc(href)}" target="_blank" rel="noopener"${l.f?' title="프롬 PC 다시보기로 열기"':''}>${lead}<span class="lk-t">${text}</span></a>`;
+    return `<div class="lr${on?" seen":""}" data-k="${l.k}">${item}`
       + `<button class="ck" type="button" aria-pressed="${on}" aria-label="봤어요 표시" title="봤어요 표시">✓</button></div>`;
   }).join("");
   return `<article class="ev${done?" done":""}"><div class="ev-head"><span class="date">${md}</span>
@@ -242,7 +257,7 @@ function updateCount(){
 $("#list").addEventListener("click", ev=>{
   const ck = ev.target.closest(".ck");
   if (ck){ const k = ck.parentElement.dataset.k; setWatched(k, !watched.has(k)); return; }
-  const lk = ev.target.closest(".lk");
+  const lk = ev.target.closest("a.lk");
   if (lk) setWatched(lk.parentElement.dataset.k, true);   // 열어 본 영상은 자동으로 '봤어요'
 });
 
