@@ -53,8 +53,7 @@ input[type=search]{flex:1;min-width:0}
 .lk{display:flex;gap:10px;align-items:center;border-radius:10px;padding:4px;margin:-4px}
 .lk:hover{background:var(--accent-soft)}
 .thumb{flex:none;width:120px;aspect-ratio:16/9;border-radius:8px;background:var(--line) center/cover no-repeat;position:relative}
-.thumb::after{content:"▶";position:absolute;right:5px;bottom:4px;font-size:10px;color:#fff;background:var(--yt);
-  border-radius:4px;padding:1px 5px}
+.tb{position:absolute;right:5px;bottom:4px;font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:1px 5px;line-height:1.4}
 .pf{flex:none;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;color:#fff;min-width:56px;text-align:center}
 .lk-t{font-size:14px;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .empty{text-align:center;color:var(--muted);padding:60px 0}
@@ -90,7 +89,7 @@ input[type=search]{flex:1;min-width:0}
 <div class="wrap">
   <header>
     <h1>프로미스나인 컨텐츠 목록</h1>
-    <div class="sub">f9_video_calendar 기준 · 오프라인 일정 제외 · 업데이트 __UPDATED__</div>
+    <div class="sub">f9_video_calendar 기준 · 2022년 이전과 TV·라디오 출연은 나무위키·프롬피디아 참고 · 오프라인 일정 제외 · 업데이트 __UPDATED__</div>
     <details class="transfer"><summary>시청 기록은 이 기기 브라우저에 저장돼요 · 다른 기기로 옮기기</summary>
       <p id="transfer-msg">이 기기에서 '내 기록 복사'를 누르고, 다른 기기의 이 칸에 붙여넣은 뒤 '붙여넣은 기록 합치기'를 누르세요.</p>
       <textarea id="transfer" rows="2" placeholder="F9W1:..." spellcheck="false"></textarea>
@@ -117,7 +116,8 @@ input[type=search]{flex:1;min-width:0}
 const DATA = /*__DATA__*/[];
 const PF = {
   youtube:["YouTube","#e5312b"], weverse:["위버스","#18c2ad"], instagram:["인스타","#c13584"],
-  tiktok:["틱톡","#222"], naver:["네이버","#03a94d"], x:["X","#444"], fromm:["프롬","#7b4fd6"], etc:["기타","#888"]
+  tiktok:["틱톡","#222"], naver:["네이버","#03a94d"], x:["X","#444"], fromm:["프롬","#7b4fd6"], etc:["기타","#888"],
+  tv:["방송","#4a5a7a"]   // TV·라디오 출연 (다시보기 링크 없이 목록에만)
 };
 const PLAYER = "http://127.0.0.1:12212/";  // 내 PC의 프롬 PC 다시보기 (프롬 영상은 여기서 재생)
 // 프롬 PC 다시보기의 '컨텐츠 목록' 버튼은 ?player=1 로 연다 → 이 브라우저를 '플레이어 있음'으로 기억한다 (?player=off 로 해제).
@@ -222,11 +222,15 @@ function card({e, links}){
   const done = links.every(l=>watched.has(l.k));
   const ls = links.map(l=>{
     const text = esc(l.t || e.s), on = watched.has(l.k);
-    const lead = l.y
-      ? `<span class="thumb" data-bg="https://i.ytimg.com/vi/${l.y}/mqdefault.jpg"></span>`
-      : `<span class="pf" style="background:${PF[l.p][1]}">${PF[l.p][0]}</span>`;
+    const pf = PF[l.p] || PF.etc;
+    const bg = l.y ? `https://i.ytimg.com/vi/${l.y}/mqdefault.jpg` : l.i ? "thumbs/" + l.i : "";
+    const lead = bg
+      ? `<span class="thumb" data-bg="${bg}"><span class="tb" style="background:${l.y ? "var(--yt)" : pf[1]}">${l.y ? "▶" : pf[0]}</span></span>`
+      : `<span class="pf" style="background:${pf[1]}">${pf[0]}</span>`;
     const href = l.f ? PLAYER + "?post=" + l.f : l.u;
-    const item = l.p === "fromm" && !(HAS_PLAYER && l.f)
+    const item = l.p === "tv"
+      ? `<div class="lk off">${lead}<span class="lk-t">${text}<span class="off-note">방송 출연 · 다시보기 링크 없음</span></span></div>`
+      : l.p === "fromm" && !(HAS_PLAYER && l.f)
       ? `<div class="lk off" title="프롬 앱에서만 볼 수 있어요">${lead}<span class="lk-t">${text}<span class="off-note">프롬 앱 전용</span></span></div>`
       : `<a class="lk" href="${esc(href)}" target="_blank" rel="noopener"${l.f?' title="프롬 PC 다시보기로 열기"':''}>${lead}<span class="lk-t">${text}</span></a>`;
     return `<div class="lr${on?" seen":""}" data-k="${l.k}">${item}`

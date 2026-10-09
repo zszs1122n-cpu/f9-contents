@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: 썸네일 줄이기용 Pillow 설치
+        run: pip install pillow
       - name: 캘린더 받아 목록 만들기
         run: python build.py
       - name: 캐시·갱신 기록 저장 (바뀐 날만 커밋)

@@ -5,3 +5,5 @@ fromm-pc/
 # 로컬 미리보기 설정
 .claude/
 __pycache__/
+# 아카이브 수집 원본(나무위키·프롬피디아 페이지 등) — archive/collect.py가 다시 받을 수 있음
+archive/raw/
