@@ -1,0 +1,7 @@
+# 빌드 결과 (GitHub Actions가 만들어 Pages에 올림)
+site/
+# 개인용 프롬 PC 플레이어 — 계정 로그인을 다루므로 저장소에 올리지 않는다
+fromm-pc/
+# 로컬 미리보기 설정
+.claude/
+__pycache__/

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프나 컨텐츠 목록</title>
+<meta name="description" content="프로미스나인 영상 캘린더의 컨텐츠를 날짜·멤버·플랫폼별로 모아 보는 목록">
+<style>
+/* 날짜별 목록 + 상단 고정 필터 */
+:root{
+  --bg:#f7f5fb; --card:#fff; --text:#1d1a24; --muted:#6f6880; --line:#e6e1ef;
+  --accent:#7b4fd6; --on-accent:#fff; --accent-soft:#efe8fc; --yt:#e5312b; --future:#0f8a6a;
+  --seen:#1f8a5b; --on-seen:#fff; --done-bg:#f1f8f4;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#141218; --card:#1e1b24; --text:#ece8f3; --muted:#a29bb3; --line:#2f2a38;
+    --accent:#b597ff; --on-accent:#1a1030; --accent-soft:#2c2340; --yt:#ff5a52; --future:#4fd1a8;
+    --seen:#4fd1a8; --on-seen:#0f2a20; --done-bg:#18231f; color-scheme:dark; }
+}
+:root[data-theme="dark"]{ --bg:#141218; --card:#1e1b24; --text:#ece8f3; --muted:#a29bb3; --line:#2f2a38;
+  --accent:#b597ff; --on-accent:#1a1030; --accent-soft:#2c2340; --yt:#ff5a52; --future:#4fd1a8;
+    --seen:#4fd1a8; --on-seen:#0f2a20; --done-bg:#18231f; color-scheme:dark; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px 80px}
+header{padding:28px 0 8px}
+h1{margin:0;font-size:24px;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.controls{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:12px 0 10px;border-bottom:1px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.row:first-child{margin-top:0}
+input[type=search],select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px}
+input[type=search]{flex:1;min-width:0}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--text);
+  border-radius:999px;padding:5px 11px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.chip:focus-visible,.lk:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.label{font-size:12px;color:var(--muted);margin-right:2px}
+.count{margin-left:auto;font-size:13px;color:var(--muted)}
+.month{margin:26px 0 8px;font-size:14px;font-weight:700;color:var(--accent)}
+.ev{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.ev-head{display:flex;gap:10px;align-items:baseline}
+.date{flex:none;font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);width:62px}
+.title{font-weight:600;word-break:break-word}
+.badge{display:inline-block;font-size:11px;font-weight:700;color:var(--future);border:1px solid currentColor;
+  border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.note{font-size:12px;color:var(--muted);margin:2px 0 0 72px}
+.links{margin:8px 0 0 72px;display:grid;gap:6px}
+.lk{display:flex;gap:10px;align-items:center;border-radius:10px;padding:4px;margin:-4px}
+.lk:hover{background:var(--accent-soft)}
+.thumb{flex:none;width:120px;aspect-ratio:16/9;border-radius:8px;background:var(--line) center/cover no-repeat;position:relative}
+.thumb::after{content:"▶";position:absolute;right:5px;bottom:4px;font-size:10px;color:#fff;background:var(--yt);
+  border-radius:4px;padding:1px 5px}
+.pf{flex:none;font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;color:#fff;min-width:56px;text-align:center}
+.lk-t{font-size:14px;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.empty{text-align:center;color:var(--muted);padding:60px 0}
+#more{height:1px}
+.lr{display:flex;gap:8px;align-items:center}
+.lr .lk{flex:1;min-width:0}
+.alt{flex:none;font-size:12px;color:var(--muted);text-decoration:underline;padding:4px}
+.ck{flex:none;width:34px;height:34px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--card);
+  color:transparent;font:700 15px/1 inherit;cursor:pointer;display:grid;place-items:center}
+.ck:hover{border-color:var(--seen);color:var(--seen)}
+.ck[aria-pressed=true]{background:var(--seen);border-color:var(--seen);color:var(--on-seen)}
+.ck:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lr.seen .lk-t{color:var(--muted)}
+.lr.seen .thumb,.lr.seen .pf{opacity:.45}
+.ev.done{background:var(--done-bg)}
+.ev.done .title{color:var(--muted)}
+.done-badge{display:none;font-size:11px;font-weight:700;color:var(--seen);border:1px solid currentColor;border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.ev.done .done-badge{display:inline-block}
+.transfer{margin-top:6px;font-size:13px;color:var(--muted)}
+.transfer summary{cursor:pointer}
+.transfer p{margin:8px 0 6px}
+.transfer textarea{width:100%;font:12px/1.4 ui-monospace,Consolas,monospace;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px;resize:vertical}
+@media (max-width:560px){
+  .ev-head{flex-direction:column;gap:0}
+  .note,.links{margin-left:0}
+  .thumb{width:104px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>프로미스나인 컨텐츠 목록</h1>
+    <div class="sub">f9_video_calendar 기준 · 오프라인 일정 제외 · 업데이트 __UPDATED__</div>
+    <details class="transfer"><summary>시청 기록은 이 기기 브라우저에 저장돼요 · 다른 기기로 옮기기</summary>
+      <p id="transfer-msg">이 기기에서 '내 기록 복사'를 누르고, 다른 기기의 이 칸에 붙여넣은 뒤 '붙여넣은 기록 합치기'를 누르세요.</p>
+      <textarea id="transfer" rows="2" placeholder="F9W1:..." spellcheck="false"></textarea>
+      <div class="row"><button class="chip" id="export" type="button">내 기록 복사</button><button class="chip" id="import" type="button">붙여넣은 기록 합치기</button></div>
+    </details>
+  </header>
+
+  <div class="controls">
+    <div class="row">
+      <input type="search" id="q" placeholder="제목·영상명 검색 (예: 워크돌, 뮤직뱅크, 쇼츠)">
+      <select id="year"></select>
+      <button class="chip" id="sort" aria-pressed="false">최신순</button>
+    </div>
+    <div class="row" id="pfRow"><span class="label">플랫폼</span></div>
+    <div class="row" id="seenRow"><span class="label">시청</span></div>
+    <div class="row" id="memRow"><span class="label">멤버</span><span class="count" id="count"></span></div>
+  </div>
+
+  <main id="list"></main>
+  <div id="more"></div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/[];
+const PF = {
+  youtube:["YouTube","#e5312b"], weverse:["위버스","#18c2ad"], instagram:["인스타","#c13584"],
+  tiktok:["틱톡","#222"], naver:["네이버","#03a94d"], x:["X","#444"], fromm:["프롬","#7b4fd6"], etc:["기타","#888"]
+};
+const PLAYER = "http://127.0.0.1:12212/";  // 내 PC의 프롬 PC 다시보기 (프롬 영상은 여기서 재생)
+// 생일순 (나이 많은 순): 새롬 97.01.07 · 하영 97.09.29 · 규리 97.12.27 · 지원 98.03.20 · 지선 98.11.23 · 서연 00.01.22 · 채영 00.05.14 · 나경 00.06.01 · 지헌 03.04.17
+const MEMBERS = ["새롬","하영","규리","지원","지선","서연","채영","나경","지헌"];
+const DOW = ["일","월","화","수","목","금","토"];
+const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
+
+const st = { q:"", year:"", pf:"youtube", seen:"", mem:new Set(), asc:false };
+try { Object.assign(st, JSON.parse(localStorage.getItem("f9-filter")||"{}"), {mem:new Set(JSON.parse(localStorage.getItem("f9-mem")||"[]"))}); } catch(e){}
+function save(){ try{ localStorage.setItem("f9-filter", JSON.stringify({pf:st.pf, year:st.year, asc:st.asc, seen:st.seen})); localStorage.setItem("f9-mem", JSON.stringify([...st.mem])); }catch(e){} }
+
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---- 시청 기록 ----
+// 링크마다 키(유튜브 영상 ID, 없으면 주소 해시)를 두고 본 것만 이 브라우저에 모아 둔다.
+// 다른 기기와는 '시청 기록 옮기기'로 복사·붙여넣기 해서 합친다.
+const watched = new Set();
+const fnv = s => { let h = 0x811c9dc5; for (let i=0; i<s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
+const keyOf = l => l.y || fnv(l.u).toString(36);
+try { JSON.parse(localStorage.getItem("f9-watched")||"[]").forEach(k=>watched.add(k)); } catch(e){}
+function saveLocal(){ try{ localStorage.setItem("f9-watched", JSON.stringify([...watched])); }catch(e){} }
+
+function setWatched(k, on){
+  if (watched.has(k) === on) return;
+  on ? watched.add(k) : watched.delete(k);
+  saveLocal(); paint();
+}
+
+$("#export").onclick = async ()=>{
+  const code = "F9W1:" + [...watched].join(",");
+  $("#transfer").value = code; $("#transfer").select();
+  try { await navigator.clipboard.writeText(code); $("#transfer-msg").textContent = `본 것 ${watched.size}개를 복사했어요. 다른 기기의 이 칸에 붙여넣으세요.`; }
+  catch(e){ $("#transfer-msg").textContent = "아래 글자를 전부 복사해서 다른 기기에 붙여넣으세요."; }
+};
+$("#import").onclick = ()=>{
+  const text = $("#transfer").value.trim();
+  if (!text.startsWith("F9W1:")){ $("#transfer-msg").textContent = "다른 기기에서 '내 기록 복사'로 만든 글자를 붙여넣어 주세요."; return; }
+  const before = watched.size;
+  text.slice(5).split(",").filter(k=>/^[\w-]{1,20}$/.test(k)).forEach(k=>watched.add(k));
+  saveLocal(); refresh();
+  $("#transfer-msg").textContent = `${watched.size - before}개를 새로 합쳤어요. 지금 본 것은 모두 ${watched.size}개예요.`;
+};
+
+// 컨트롤 생성
+const years = [...new Set(DATA.map(e=>e.d.slice(0,4)))].sort().reverse();
+$("#year").innerHTML = `<option value="">전체 연도</option>` + years.map(y=>`<option>${y}</option>`).join("");
+$("#year").value = st.year;
+const pfRow = $("#pfRow");
+[["all","전체"], ...Object.entries(PF).map(([k,v])=>[k,v[0]])].forEach(([k,label])=>{
+  const b = document.createElement("button"); b.className="chip"; b.textContent=label; b.dataset.pf=k;
+  b.onclick = ()=>{ st.pf=k; refresh(); }; pfRow.appendChild(b);
+});
+const seenRow = $("#seenRow");
+[["","전체"],["no","안 본 것"],["yes","본 것"]].forEach(([k,label])=>{
+  const b = document.createElement("button"); b.className="chip"; b.textContent=label; b.dataset.seen=k;
+  b.onclick = ()=>{ st.seen=k; refresh(); }; seenRow.appendChild(b);
+});
+const memRow = $("#memRow"), countEl = $("#count");
+MEMBERS.forEach(m=>{
+  const b = document.createElement("button"); b.className="chip"; b.textContent=m; b.dataset.m=m;
+  b.onclick = ()=>{ st.mem.has(m)?st.mem.delete(m):st.mem.add(m); refresh(); };
+  memRow.insertBefore(b, countEl);
+});
+$("#q").oninput = e=>{ st.q=e.target.value.trim().toLowerCase(); refresh(); };
+$("#year").onchange = e=>{ st.year=e.target.value; refresh(); };
+$("#sort").onclick = ()=>{ st.asc=!st.asc; refresh(); };
+
+// 검색용 문자열·시청 키 미리 만들기
+DATA.forEach(e=>{ e._s = (e.s+" "+e.n+" "+e.l.map(l=>l.t).join(" ")).toLowerCase(); e.l.forEach(l=>l.k=keyOf(l)); });
+
+let rows = [], shown = 0;
+function filter(){
+  const out = [];
+  for (const e of DATA){
+    if (st.year && !e.d.startsWith(st.year)) continue;
+    if (st.q && !st.q.split(/\s+/).every(w=>e._s.includes(w))) continue;
+    if (st.mem.size && ![...st.mem].some(m=>e.s.includes(m))) continue;
+    let links = st.pf==="all" ? e.l : e.l.filter(l=>l.p===st.pf);
+    if (st.seen) links = links.filter(l=>watched.has(l.k) === (st.seen==="yes"));
+    if (!links.length) continue;
+    out.push({e, links});
+  }
+  if (st.asc) out.reverse();
+  return out;
+}
+
+function card({e, links}){
+  const dt = new Date(e.d+"T00:00:00");
+  const md = `${e.d.slice(5,7)}.${e.d.slice(8,10)} (${DOW[dt.getDay()]})`;
+  const done = links.every(l=>watched.has(l.k));
+  const ls = links.map(l=>{
+    const text = esc(l.t || e.s), on = watched.has(l.k);
+    const lead = l.y
+      ? `<span class="thumb" data-bg="https://i.ytimg.com/vi/${l.y}/mqdefault.jpg"></span>`
+      : `<span class="pf" style="background:${PF[l.p][1]}">${PF[l.p][0]}</span>`;
+    const href = l.f ? PLAYER + "?post=" + l.f : l.u;
+    const alt = l.f ? `<a class="alt" href="${esc(l.u)}" target="_blank" rel="noopener" title="PC 플레이어가 없을 때">프롬 앱</a>` : "";
+    return `<div class="lr${on?" seen":""}" data-k="${l.k}"><a class="lk" href="${esc(href)}" target="_blank" rel="noopener"${l.f?' title="프롬 PC 다시보기로 열기"':''}>${lead}<span class="lk-t">${text}</span></a>${alt}`
+      + `<button class="ck" type="button" aria-pressed="${on}" aria-label="봤어요 표시" title="봤어요 표시">✓</button></div>`;
+  }).join("");
+  return `<article class="ev${done?" done":""}"><div class="ev-head"><span class="date">${md}</span>
+    <span class="title">${esc(e.s)}${e.d>today?'<span class="badge">예정</span>':''}<span class="done-badge">다 봤어요</span></span></div>
+    ${e.n?`<div class="note">${esc(e.n)}</div>`:""}<div class="links">${ls}</div></article>`;
+}
+
+// 목록을 다시 그리지 않고 시청 표시만 갱신
+function paint(){
+  document.querySelectorAll("#list .ev").forEach(ev=>{
+    let all = true;
+    ev.querySelectorAll(".lr").forEach(r=>{
+      const on = watched.has(r.dataset.k); if (!on) all = false;
+      r.classList.toggle("seen", on); r.querySelector(".ck").setAttribute("aria-pressed", on);
+    });
+    ev.classList.toggle("done", all);
+  });
+  updateCount();
+}
+function updateCount(){
+  let n = 0, seen = 0;
+  rows.forEach(r=>r.links.forEach(l=>{ n++; if (watched.has(l.k)) seen++; }));
+  countEl.textContent = `${rows.length.toLocaleString()}개 일정 · 링크 ${n.toLocaleString()}개 · 본 것 ${seen.toLocaleString()}개`;
+}
+
+$("#list").addEventListener("click", ev=>{
+  const ck = ev.target.closest(".ck");
+  if (ck){ const k = ck.parentElement.dataset.k; setWatched(k, !watched.has(k)); return; }
+  const lk = ev.target.closest(".lk");
+  if (lk) setWatched(lk.parentElement.dataset.k, true);   // 열어 본 영상은 자동으로 '봤어요'
+});
+
+const thumbObs = new IntersectionObserver(ents=>ents.forEach(en=>{
+  if (en.isIntersecting){ const t=en.target; t.style.backgroundImage=`url(${t.dataset.bg})`; thumbObs.unobserve(t); }
+}), {rootMargin:"300px"});
+
+let lastMonth = "";
+function renderMore(n=60){
+  const list = $("#list"); let html = "";
+  const end = Math.min(rows.length, shown+n);
+  for (; shown<end; shown++){
+    const r = rows[shown], m = r.e.d.slice(0,7);
+    if (m!==lastMonth){ html += `<h2 class="month">${m.slice(0,4)}년 ${+m.slice(5)}월</h2>`; lastMonth=m; }
+    html += card(r);
+  }
+  list.insertAdjacentHTML("beforeend", html);
+  list.querySelectorAll(".thumb[data-bg]:not([data-o])").forEach(t=>{ t.dataset.o=1; thumbObs.observe(t); });
+  // 화면이 아직 안 찼으면 계속 채우기 (observer는 상태가 바뀔 때만 알려주므로)
+  requestAnimationFrame(()=>{
+    if (shown<rows.length && $("#more").getBoundingClientRect().top < innerHeight+800) renderMore();
+  });
+}
+
+function refresh(){
+  save();
+  pfRow.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed", b.dataset.pf===st.pf));
+  seenRow.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed", b.dataset.seen===st.seen));
+  memRow.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed", st.mem.has(b.dataset.m)));
+  $("#sort").textContent = st.asc ? "오래된순" : "최신순";
+  rows = filter(); shown = 0; lastMonth = "";
+  updateCount();
+  $("#list").innerHTML = rows.length ? "" : `<div class="empty">조건에 맞는 컨텐츠가 없어요</div>`;
+  renderMore();
+}
+
+new IntersectionObserver(ents=>{ if (ents[0].isIntersecting && shown<rows.length) renderMore(); },
+  {rootMargin:"800px"}).observe($("#more"));
+refresh();
+</script>
+</body>
+</html>

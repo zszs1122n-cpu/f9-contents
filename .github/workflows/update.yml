@@ -1,0 +1,48 @@
+name: 컨텐츠 목록 갱신
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 매일 03:00 (한국 시간) = 18:00 UTC
+  workflow_dispatch:       # Actions 탭에서 'Run workflow'로 바로 실행
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 캘린더 받아 목록 만들기
+        run: python build.py
+      - name: 캐시·갱신 기록 저장 (바뀐 날만 커밋)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .cache
+          git diff --cached --quiet || { git commit -m "컨텐츠 목록 자동 갱신"; git push; }
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
