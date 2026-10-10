@@ -4,7 +4,7 @@
 - build.py가 매일 새 글만 받는다(첫 페이지부터, 이미 아는 글만 있는 페이지가 나올 때까지).
 - python gallery.py      처음 한 번(또는 가끔) 자료탭 전체를 받는다. 중간에 끊겨도 다시 실행하면 이어서 받는다.
 받은 글 목록(번호·작성일·제목)은 .cache/gallery-posts.json에 모아 두고 저장소에 함께 커밋한다.
-영상·쇼츠는 캘린더에 이미 있으니 넣지 않고, 일정·티켓 안내 같은 공지 글도 뺀다.
+영상·쇼츠·릴스는 캘린더에 이미 있으니 넣지 않고, 일정·티켓 안내 같은 공지 글도 뺀다.
 """
 import html
 import json
@@ -24,10 +24,11 @@ VIEW_URL = f"https://gall.dcinside.com/mgallery/board/view/?id={GALL}&no={{}}"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 
 # 제목을 ' + ', ' & ' 등으로 나눈 조각 중 하나라도 SNS 글이면 넣는다(그 조각에 영상 말이 없을 때).
-PHOTO = re.compile(r"인스타|인스스|인별|스토리|릴스|[공일]\s?[Xx](?![a-z])|공트|일본\s?공트|트위터|트윗|위버스|웨이보|공카"
+PHOTO = re.compile(r"인스타|인스스|인별|스토리|[공일]\s?[Xx](?![a-z])|공트|일본\s?공트|트위터|트윗|위버스|웨이보|공카"
                    r"|페북|페이스북|포스트|게시물|게시글|프사|배사|프로필|사이트|화보"
                    r"|(?:[꿀헌빵냥젼챙꽹송꼬롬션센쎈귤공갠]|지센|지쎈)+(?:스타|토리|버스)", re.I)
-VIDEO = re.compile(r"쇼츠|shorts|직캠|유튜브|공튜브|공튭|예고|선공개|하이라이트|풀버전|기사", re.I)
+# 릴스도 캘린더에 이미 있는 경우가 많아 영상으로 친다('인스타 릴스'는 빠지고 '인스타 + 릴스'의 인스타는 남음)
+VIDEO = re.compile(r"릴스|쇼츠|shorts|직캠|유튜브|공튜브|공튭|예고|선공개|하이라이트|풀버전|기사", re.I)
 # 공지·일정 글은 통째로 뺀다
 NOTICE = re.compile(r"안내|공지|일정|티켓|예매|판매|오픈|배치도|타임\s?테이블|혜택|이벤트|추첨|모금")
 
@@ -171,7 +172,7 @@ def events(posts):
             continue
         name = re.sub(r"^\s*(?:\d{6}\s+)+", "", title).strip() or title
         e = {"d": content_date(title, posted), "s": name, "n": "",
-             "l": [{"u": VIEW_URL.format(no), "t": "갤러리에서 보기", "p": "gallery"}]}
+             "l": [{"u": VIEW_URL.format(no), "t": "자료 보기", "p": "gallery"}]}
         mem = members_of(title)
         if mem:
             e["m"] = " ".join(mem)
