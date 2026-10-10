@@ -183,7 +183,7 @@ const years = [...new Set(DATA.map(e=>e.d.slice(0,4)))].sort().reverse();
 $("#year").innerHTML = `<option value="">전체 연도</option>` + years.map(y=>`<option>${y}</option>`).join("");
 $("#year").value = st.year;
 const pfRow = $("#pfRow");
-[["all","전체"], ...Object.entries(PF).map(([k,v])=>[k,v[0]])].forEach(([k,label])=>{
+[["all","전체"], ["nogallery","자료 제외"], ...Object.entries(PF).map(([k,v])=>[k,v[0]])].forEach(([k,label])=>{
   const b = document.createElement("button"); b.className="chip"; b.textContent=label; b.dataset.pf=k;
   b.onclick = ()=>{ st.pf=k; refresh(); }; pfRow.appendChild(b);
 });
@@ -212,7 +212,7 @@ function filter(){
     if (st.year && !e.d.startsWith(st.year)) continue;
     if (st.q && !st.q.split(/\s+/).every(w=>e._s.includes(w))) continue;
     if (st.mem.size && ![...st.mem].some(m=>e._m.includes(m))) continue;   // m: 갤러리 제목의 애칭(젼토리 등)에서 찾은 멤버
-    let links = st.pf==="all" ? e.l : e.l.filter(l=>l.p===st.pf);
+    let links = st.pf==="all" ? e.l : st.pf==="nogallery" ? e.l.filter(l=>l.p!=="gallery") : e.l.filter(l=>l.p===st.pf);
     if (st.seen) links = links.filter(l=>watched.has(l.k) === (st.seen==="yes"));
     if (!links.length) continue;
     out.push({e, links});
