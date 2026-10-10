@@ -89,7 +89,7 @@ input[type=search]{flex:1;min-width:0}
 <div class="wrap">
   <header>
     <h1>프로미스나인 컨텐츠 목록</h1>
-    <div class="sub">f9_video_calendar 기준 · 2022년 이전과 TV·라디오 출연은 나무위키·프롬피디아 참고 · 오프라인 일정 제외 · 업데이트 __UPDATED__</div>
+    <div class="sub">f9_video_calendar 기준 · 2022년 이전과 TV·라디오 출연은 나무위키·프롬피디아 참고 · 인스타·스토리 등 사진은 프로미스나인 갤러리 자료탭 · 오프라인 일정 제외 · 업데이트 __UPDATED__</div>
     <details class="transfer"><summary>시청 기록은 이 기기 브라우저에 저장돼요 · 다른 기기로 옮기기</summary>
       <p id="transfer-msg">이 기기에서 '내 기록 복사'를 누르고, 다른 기기의 이 칸에 붙여넣은 뒤 '붙여넣은 기록 합치기'를 누르세요.</p>
       <textarea id="transfer" rows="2" placeholder="F9W1:..." spellcheck="false"></textarea>
@@ -117,7 +117,8 @@ const DATA = /*__DATA__*/[];
 const PF = {
   youtube:["YouTube","#e5312b"], weverse:["위버스","#18c2ad"], instagram:["인스타","#c13584"],
   tiktok:["틱톡","#222"], naver:["네이버","#03a94d"], x:["X","#444"], fromm:["프롬","#7b4fd6"], etc:["기타","#888"],
-  tv:["방송","#4a5a7a"]   // TV·라디오 출연 (다시보기 링크 없이 목록에만)
+  tv:["방송","#4a5a7a"],   // TV·라디오 출연 (다시보기 링크 없이 목록에만)
+  gallery:["갤러리","#3b4890"]   // 디시 프로미스나인 갤러리 자료탭의 사진 글 (인스타·스토리·공식 X 등)
 };
 const PLAYER = "http://127.0.0.1:12212/";  // 내 PC의 프롬 PC 다시보기 (프롬 영상은 여기서 재생)
 // 프롬 PC 다시보기의 '컨텐츠 목록' 버튼은 ?player=1 로 연다 → 이 브라우저를 '플레이어 있음'으로 기억한다 (?player=off 로 해제).
@@ -202,7 +203,7 @@ $("#year").onchange = e=>{ st.year=e.target.value; refresh(); };
 $("#sort").onclick = ()=>{ st.asc=!st.asc; refresh(); };
 
 // 검색용 문자열·시청 키 미리 만들기
-DATA.forEach(e=>{ e._s = (e.s+" "+e.n+" "+e.l.map(l=>l.t).join(" ")).toLowerCase(); e.l.forEach(l=>l.k=keyOf(l)); });
+DATA.forEach(e=>{ e._m = e.s+" "+(e.m||""); e._s = (e._m+" "+e.n+" "+e.l.map(l=>l.t).join(" ")).toLowerCase(); e.l.forEach(l=>l.k=keyOf(l)); });
 
 let rows = [], shown = 0;
 function filter(){
@@ -210,7 +211,7 @@ function filter(){
   for (const e of DATA){
     if (st.year && !e.d.startsWith(st.year)) continue;
     if (st.q && !st.q.split(/\s+/).every(w=>e._s.includes(w))) continue;
-    if (st.mem.size && ![...st.mem].some(m=>e.s.includes(m))) continue;
+    if (st.mem.size && ![...st.mem].some(m=>e._m.includes(m))) continue;   // m: 갤러리 제목의 애칭(젼토리 등)에서 찾은 멤버
     let links = st.pf==="all" ? e.l : e.l.filter(l=>l.p===st.pf);
     if (st.seen) links = links.filter(l=>watched.has(l.k) === (st.seen==="yes"));
     if (!links.length) continue;

@@ -3,6 +3,7 @@
 사용법:  python build.py
 - 링크가 하나도 없는 일정(오프라인 행사 등)은 제외한다.
 - 캘린더는 2022년부터라서, 그 이전 컨텐츠와 TV·라디오 출연은 archive/archive.json(archive/collect.py가 만듦)에서 합친다.
+- 멤버 인스타·스토리, 공식 X, 학교·방송사 인스타 같은 사진 글은 디시 프로미스나인 갤러리 자료탭에서 합친다(gallery.py).
 - 유튜브가 아닌 링크는 대표 이미지를 받아 작게 줄여 .cache/thumbs/ 에 두고 site/thumbs/ 로 함께 올린다(Pillow 필요).
 - 결과는 site/index.html (데이터가 내장되어 있어 더블클릭으로도 열림). GitHub Actions가 매일 이걸 GitHub Pages에 올린다.
 - .cache/ 에는 프롬 짧은 링크 → 영상 번호 캐시, 썸네일, 마지막 빌드 정보가 남는다(저장소에 함께 커밋).
@@ -12,13 +13,18 @@ import hashlib
 import html
 import io
 import json
+import os
 import re
 import shutil
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+import gallery
 
 CAL_ID = "c04c6ea6c1d803550616182c4ef41f596fc5fbe4d5b51d2294b2003c3c14b1ce@group.calendar.google.com"
 ICS_URL = f"https://calendar.google.com/calendar/ical/{CAL_ID.replace('@', '%40')}/public/basic.ics"
@@ -175,13 +181,44 @@ def merge_archive(events):
     return out
 
 
+def merge_gallery(events):
+    """갤러리 자료탭의 사진 글을 목록에 합친다(새 글만 받아 .cache/gallery-posts.json에 쌓음)."""
+    out = events + gallery.events(gallery.update())
+    out.sort(key=lambda e: (e["d"], e["s"], [l["u"] for l in e["l"]]), reverse=True)
+    return out
+
+
 THUMBS = CACHE / "thumbs"
+GALLERY_THUMBS_SINCE = "2025-01-01"  # 갤러리 글은 이 날 이후 것만 썸네일을 만든다(글마다 페이지를 받아야 해서)
+# 디시는 빨리 많이 받으면 한동안 빈 응답만 준다 → 한 번에 하나씩 천천히, 한 번 빌드에 최신 글부터 이만큼만
+GALLERY_THUMBS_PER_RUN = int(os.environ.get("GALLERY_THUMBS_PER_RUN", "300"))
+DC_SLOTS = threading.Semaphore(1)
+dc_blocked = threading.Event()
+
+
+class DcBlocked(Exception):
+    """디시가 빈 응답을 줌(잠시 막힘) → '없음'으로 적지 않고 다음 빌드에 다시 시도"""
+
+
+def dc_get(url, timeout=40):
+    if dc_blocked.is_set():
+        raise DcBlocked
+    with DC_SLOTS:
+        data = http_get(url, timeout=timeout)
+        time.sleep(1.5)
+    if not data:
+        dc_blocked.set()
+        raise DcBlocked
+    return data
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 BOT_UA = "facebookexternalhit/1.1"  # 위버스·인스타 등은 미리보기용 봇에게만 대표 이미지를 준다
 
 
 def http_get(url, ua=UA, timeout=20):
-    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept-Language": "ko-KR,ko;q=0.9"})
+    headers = {"User-Agent": ua, "Accept-Language": "ko-KR,ko;q=0.9"}
+    if "dcinside.co" in url:  # 디시 이미지는 디시에서 온 요청에만 나온다
+        headers["Referer"] = "https://gall.dcinside.com/"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
 
@@ -189,6 +226,11 @@ def http_get(url, ua=UA, timeout=20):
 def thumb_source(l):
     """링크의 대표 이미지 주소. 없으면 None."""
     p, u = l["p"], l["u"]
+    if p == "gallery":  # 글의 첫 사진
+        page = dc_get(u).decode("utf-8", "replace")
+        body = page[page.find('class="write_div"'):]
+        m = re.search(r'https://dcimg\d*\.dcinside\.co\.kr/viewimage\.php\?[^"\'\s]+', body)
+        return html.unescape(m.group(0)) if m else None
     if p == "tiktok":
         j = json.loads(http_get("https://www.tiktok.com/oembed?url=" + urllib.parse.quote(u, safe="")))
         return j.get("thumbnail_url")
@@ -212,7 +254,8 @@ def make_thumb(l, dest):
     src = thumb_source(l)
     if not src:
         return False
-    im = Image.open(io.BytesIO(http_get(src))).convert("RGB")
+    data = dc_get(src) if l["p"] == "gallery" else http_get(src)
+    im = Image.open(io.BytesIO(data)).convert("RGB")
     w, h = im.size
     if w / h < 16 / 9:  # 세로로 긴 사진은 얼굴이 있는 위쪽을 조금 더 남긴다
         nh = int(w * 9 / 16)
@@ -235,7 +278,8 @@ def attach_thumbs(events):
     THUMBS.mkdir(parents=True, exist_ok=True)
     today = date.today()
     links = {url_key(l["u"]): l for e in events for l in e["l"]
-             if not l.get("y") and l["p"] not in ("tv", "fromm") and l["u"].startswith("http")}
+             if not l.get("y") and l["p"] not in ("tv", "fromm") and l["u"].startswith("http")
+             and (l["p"] != "gallery" or e["d"] >= GALLERY_THUMBS_SINCE)}
 
     def due(k):
         v = known.get(k)
@@ -243,7 +287,10 @@ def attach_thumbs(events):
             return not (THUMBS / v).exists()
         return v is None or (today - date.fromisoformat(v["miss"])).days >= 30
 
-    todo = [k for k in links if due(k)]
+    todo = [k for k in links if due(k) and links[k]["p"] != "gallery"]
+    # 갤러리 글은 최신 글부터 GALLERY_THUMBS_PER_RUN개만 (나머지는 다음 빌드에)
+    todo += sorted((k for k in links if due(k) and links[k]["p"] == "gallery"),
+                   key=lambda k: int(k.rsplit("no=", 1)[-1]), reverse=True)[:GALLERY_THUMBS_PER_RUN]
     try:
         import PIL  # noqa: F401
     except ImportError:
@@ -256,16 +303,21 @@ def attach_thumbs(events):
         name = hashlib.sha1(k.encode("utf-8")).hexdigest()[:16] + ".jpg"
         try:
             return k, name if make_thumb(links[k], THUMBS / name) else None
+        except DcBlocked:
+            return k, "retry"
         except Exception:  # 막힌 곳·지워진 글·이상한 이미지 등은 모두 '없음'으로
             return k, None
 
     with cf.ThreadPoolExecutor(8) as ex:
         for n, (k, name) in enumerate(ex.map(one, todo), 1):
-            known[k] = name or {"miss": today.isoformat()}
+            if name != "retry":
+                known[k] = name or {"miss": today.isoformat()}
             if n % 100 == 0:
                 print(f"  {n}/{len(todo)}")
                 cache_file.write_text(json.dumps(known, indent=0, sort_keys=True), encoding="utf-8")
     cache_file.write_text(json.dumps(known, indent=0, sort_keys=True), encoding="utf-8")
+    if dc_blocked.is_set():
+        print("디시가 잠시 막혀 갤러리 썸네일 일부는 다음 빌드에 다시 받음")
 
     used = set()
     for k, l in links.items():
@@ -294,6 +346,7 @@ def main():
     SITE.mkdir(exist_ok=True)
     resolve_fromm(events)
     events = merge_archive(events)
+    events = merge_gallery(events)
     attach_thumbs(events)
     template = (HERE / "template.html").read_text(encoding="utf-8")
     data = json.dumps(events, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
