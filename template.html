@@ -136,9 +136,13 @@ const MEMBERS = ["새롬","하영","규리","지원","지선","서연","채영",
 const DOW = ["일","월","화","수","목","금","토"];
 const today = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
 
-const st = { q:"", year:"", pf:"youtube", seen:"", mem:new Set(), asc:false };
-try { Object.assign(st, JSON.parse(localStorage.getItem("f9-filter")||"{}"), {mem:new Set(JSON.parse(localStorage.getItem("f9-mem")||"[]"))}); } catch(e){}
-function save(){ try{ localStorage.setItem("f9-filter", JSON.stringify({pf:st.pf, year:st.year, asc:st.asc, seen:st.seen})); localStorage.setItem("f9-mem", JSON.stringify([...st.mem])); }catch(e){} }
+const st = { q:"", year:"", pf:"all", seen:"", mem:new Set(), asc:false };
+try {
+  const saved = JSON.parse(localStorage.getItem("f9-filter")||"{}");
+  if (saved.v !== 2) delete saved.pf;  // 예전 기본값(YouTube)이 저장된 브라우저도 한 번은 '전체'로 시작
+  Object.assign(st, saved, {mem:new Set(JSON.parse(localStorage.getItem("f9-mem")||"[]"))});
+} catch(e){}
+function save(){ try{ localStorage.setItem("f9-filter", JSON.stringify({v:2, pf:st.pf, year:st.year, asc:st.asc, seen:st.seen})); localStorage.setItem("f9-mem", JSON.stringify([...st.mem])); }catch(e){} }
 
 const $ = s => document.querySelector(s);
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
