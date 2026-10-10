@@ -183,7 +183,7 @@ const years = [...new Set(DATA.map(e=>e.d.slice(0,4)))].sort().reverse();
 $("#year").innerHTML = `<option value="">전체 연도</option>` + years.map(y=>`<option>${y}</option>`).join("");
 $("#year").value = st.year;
 const pfRow = $("#pfRow");
-[["all","전체"], ["nogallery","자료 제외"], ...Object.entries(PF).map(([k,v])=>[k,v[0]])].forEach(([k,label])=>{
+[["all","전체"], ...Object.entries(PF).map(([k,v])=>[k,v[0]]), ["nogallery","자료 제외"]].forEach(([k,label])=>{
   const b = document.createElement("button"); b.className="chip"; b.textContent=label; b.dataset.pf=k;
   b.onclick = ()=>{ st.pf=k; refresh(); }; pfRow.appendChild(b);
 });
